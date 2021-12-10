@@ -1,5 +1,5 @@
 FC=gfortran
-FC1=ifort
+#FC=ifort
 FFLAGS=-O3
 SRC=modules.F90 		\
 	multigrid.F90 		\
@@ -12,11 +12,8 @@ FNAME=multigrid
 %.o : %.F90
 	$(FC) $(FFLAGS) -o $@ -c $<
 
-mac : $(OBJ)
+default : $(OBJ)
 	$(FC) $(FFLAGS) -o $(FNAME) $(OBJ)
-
-lab : $(OBJ)
-	$(FC1) $(FFLAGS) -o $(FNAME) $(OBJ)
 
 clean:
 	@rm *.mod *.o 

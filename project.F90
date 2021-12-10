@@ -6,13 +6,15 @@ program numerical_project
 
     open(unit=logfile,file='log.dat',status='unknown')
     
-    
     residual = 1
     s(:,:) = 0.0
+    start_time = 0.0
+    end_time = 0.0
 
     select case(solver)
     case(gs)
-        write(logfile,*) 'nx = ', nx, ' ny = ', ny, ' Solver = Gauss Seidel'
+        call cpu_time(start_time)
+        write(logfile,*) 'nx = ', nx-1, ' ny = ', ny-1, ' Solver = Gauss Seidel'
         write(logfile,*) 'Iteration        Residual'
         do while(residual>tol .and. iter<maxiter)
             call gauss_seidel(nx,ny,dx,w,s,ukp1)
@@ -21,9 +23,12 @@ program numerical_project
             uk = ukp1 
             iter = iter + 1
         end do
+        call cpu_time(end_time)
+        write(logfile,*) 'Elapsed time = ', end_time-start_time
     case(multiG)
-        call init_multigrid(nx,ny)
-        write(logfile,*) 'nx = ', nx, ' ny = ', ny,' Solver = Multigrid, Smoother = ', it_smoother
+        call cpu_time(start_time)
+        call init_multigrid(nx,ny,nlev)
+        write(logfile,*) 'nx = ', nx-1, ' ny = ', ny-1,' Solver = Multigrid, Smoother = ', it_smoother
         write(logfile,*) 'Iteration        Residual'
         do while(residual>tol .and. iter<maxiter)
             call multigrid(nx,ny,uk,nlev,it_smoother,w,ukp1)
@@ -33,6 +38,9 @@ program numerical_project
             iter = iter + 1
         end do
         call end_multigrid()
+        call cpu_time(end_time)
+        write(logfile,*) 
+        write(logfile,*) 'Elapsed time = ', end_time-start_time
     endselect
 
     u(:,:) = ukp1(:,:)
@@ -63,14 +71,14 @@ subroutine init_simulation()
     do i=1,ny 
         write(15,*) u_init(:,i)
     enddo
-    ! close(15)
+    close(15)
     ! open(17,file='random_number.dat',status='old')
     ! do i=1,ny 
     !     read(17,*) u_init(:,i)
     ! enddo
     ! close(17)
 
-    u_init(:,:) = u_init(:,:)*0.0
+    u_init(:,:) = u_init(:,:)
     
     ! Setting Boundary Conditions
     u_init(:,1) = sin(kw*x(:))
@@ -78,7 +86,6 @@ subroutine init_simulation()
     u_init(1,:) = sin(kw*y(:))
     u_init(nx,:) = 0
 
-    write(*,*) sin(kw*x(2)),kw*x(2)
     u(:,:) = u_init(:,:)
     ukp1(:,:) = u(:,:)
     uk(:,:) = u(:,:)
@@ -119,11 +126,6 @@ subroutine read_input()
 
     dx = 2*pi/(nx-1)
     dy = 2*pi/(ny-1)
-
-    write(*,*) 'nx = ', nx, ' ny = ', ny, ' Solver = ', solver, &
-    ' Smoother = ', it_smoother, ' w = ', w, ' tol = ', tol, ' maxiter = ', maxiter, ' nlev = ', nlev, &
-    ' kw = ', kw, ' dx = ', dx, ' dy = ', dy
-
 
 endsubroutine read_input
 

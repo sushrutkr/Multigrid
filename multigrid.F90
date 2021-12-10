@@ -1,42 +1,28 @@
 module multigrid_mod
     implicit none
-    integer :: i,j
+    integer :: i,j,n
     integer :: mx1, my1, mx2, my2, smoother ! number of grid points in x and y direction
     real :: dxm, dym, w ! weight for smoother !!! using the same variable again might be a problem !!!
     real, parameter :: pi = 3.141592653589793238462643383279502884197
     real, dimension(:,:), allocatable :: f
+    real, dimension(:,:,:), allocatable :: res, err
 endmodule
 
-subroutine init_multigrid(nx,ny)
+subroutine init_multigrid(nx,ny,nlev)
     use multigrid_mod
-    integer, intent(in) :: nx, ny
-    mx1 = nx 
-    my1 = ny
-    mx2 = (mx1-1)/2 + 1
-    my2 = (my1-1)/2 + 1
-    ! allocate(res1(mx1,my1))
-    ! allocate(res2(mx2,my2))
-    ! allocate(err2(mx2,my2))
-    ! allocate(err1(mx1,my1))
-
+    integer, intent(in) :: nx, ny, nlev
+    allocate(res(nx,ny,nlev))
+    allocate(err(nx,ny,nlev))
     allocate(f(nx,ny))
 end subroutine init_multigrid
 
-subroutine end_multigrid()
-    use multigrid_mod
-    deallocate(f)
-    ! deallocate(res1,res2,err1,err2)
-end subroutine end_multigrid
-
 subroutine multigrid(nx,ny,uk,nlev,solver,relax,ukp1)
     use multigrid_mod
-    integer, intent(in) :: nx, ny, nlev,solver
+    integer, intent(in) :: nx, ny, nlev, solver
     real, intent(in) :: relax
     real, dimension(nx,ny), intent(in) :: uk 
     real, dimension(nx,ny), intent(out) :: ukp1
-    real, dimension(nx,ny) :: source
-    real, dimension(mx1,my1) :: res1, err1
-    real, dimension(mx2,my2) :: res2, err2
+    real, dimension(nx,ny) :: source, gs_src, gsout 
 
     w = relax
     smoother = solver
@@ -47,6 +33,8 @@ subroutine multigrid(nx,ny,uk,nlev,solver,relax,ukp1)
 
     f(:,:) = uk(:,:)
     source(:,:) = 0.0
+    res(:,:,:) = 0.0
+    err(:,:,:) = 0.0
 
     call gauss_seidel(mx1,my1,dxm,w,source,f)
     ! open(15,file='gs1.dat',status='unknown')
@@ -55,48 +43,60 @@ subroutine multigrid(nx,ny,uk,nlev,solver,relax,ukp1)
     ! enddo
     ! close(15)
 
-    call calc_r_multigrid(res1)
+    call calc_r_multigrid()
     ! open(15,file='res1.dat',status='unknown')
     ! do i=my1,1,-1
-    !     write(15,*) res1(:,i)
+    !     write(15,*) res(:,i,1)
     ! enddo
     ! close(15)
-    
-    mx2 = (mx1-1)/2 + 1
-    my2 = (my1-1)/2 + 1
-    dxm = 2*pi/(mx2-1)
-    dym = 2*pi/(my2-1)
-    res2(:,:) = 0.0
-    err2(:,:) = 0.0
+
 
     ! Restriction
-    call restriction(res1,res2)
-    ! open(15,file='res2.dat',status='unknown')
-    ! do i=my2,1,-1
-    !     write(15,*) res2(:,i)
-    ! enddo
-    ! close(15)
+    do n=2,nlev
+        mx2 = (mx1-1)/2 + 1
+        my2 = (my1-1)/2 + 1
+        dxm = 2*pi/(mx2-1)
+        dym = 2*pi/(my2-1)
+        call restriction()
+        ! open(15,file='res2.dat',status='unknown')
+        ! do i=my2,1,-1
+        !     write(15,*) res(:,i,n)
+        ! enddo
+        ! close(15)
+        !Solving Error Equation
+        gsout(:,:) = 0.0
+        do k = 1,1
+            gs_src(:,:) = 0.0
+            gs_src(1:mx2,1:my2) = res(1:mx2,1:my2,n)
+            call gauss_seidel(mx2,my2,dxm,w,gs_src(1:mx2,1:my2),gsout(1:mx2,1:my2))
+            err(1:mx2,1:my2,n) = gsout(:,:)
+        end do
+        ! open(15,file='err2.dat',status='unknown')
+        ! do i=my2,1,-1
+        !     write(15,*) err(:,i,n)
+        ! enddo
+        ! close(15)
+        mx1 = mx2
+        my1 = my2
+    enddo
 
-    !Solving Error Equation
-    do k = 1,1
-        call gauss_seidel(mx2,my2,dxm,w,res2,err2) ! Maybe multiple gauss seidel iterations?? - Could be done but thats a choice to make    
-    end do
-    ! open(15,file='err2.dat',status='unknown')
-    ! do i=my2,1,-1
-    !     write(15,*) err2(:,i)
-    ! enddo
-    ! close(15)
+    
 
     ! Prolongation
-    err1(:,:) = 0.0
-    call prolongation(err2,err1)
-    ! open(15,file='err1.dat',status='unknown')
-    ! do i=my1,1,-1
-    !     write(15,*) err1(:,i)
-    ! enddo
-    ! close(15)
+    do n=nlev-1,1,-1 !nlev-1 to remove the last prolongation - might need testing
+        mx1 = (mx2-1)*2 + 1
+        my1 = (my2-1)*2 + 1
+        call prolongation()
+        ! open(15,file='err1.dat',status='unknown')
+        ! do i=my1,1,-1
+        !     write(15,*) err(:,i,n)
+        ! enddo
+        ! close(15)
+        mx2 = mx1
+        my2 = my1
+    enddo
 
-    f(:,:) = f(:,:) - err1(:,:)
+    f(:,:) = f(:,:) - err(:,:,1)
     ! open(15,file='fc.dat',status='unknown')
     ! do i=my1,1,-1
     !     write(15,*) f(:,i)
@@ -105,11 +105,9 @@ subroutine multigrid(nx,ny,uk,nlev,solver,relax,ukp1)
     ukp1(:,:) = f(:,:)
 endsubroutine multigrid
 
-subroutine restriction(res11,res22)
+subroutine restriction()
     use multigrid_mod
     integer :: i1, j1, incx, incy
-    real, dimension(mx1,my1), intent(in) :: res11
-    real, dimension(mx2,my2), intent(inout) :: res22
     ! This is one method, other could be the increment one in notes - requires testing
     ! for restriction trapezoidal rule can be used 
     incx = 0
@@ -118,21 +116,18 @@ subroutine restriction(res11,res22)
         do i = 2, mx2 - 1
             i1 = 2*i - 1
             j1 = 2*j - 1
-            res22(i,j) = (res11(i1,j1) &
-                       + 0.5*(res11(i1-1,j1) + res11(i1+1,j1) + res11(i1,j1+1) + res11(i1,j1-1)) &
-                       + 0.25*(res11(i1-1,j1-1) + res11(i1-1,j1+1) + res11(i1+1,j1-1) + res11(i1+1,j1+1)))/(4)
+            res(i,j,n) = (res(i1,j1,n-1) &
+                          + 0.5*(res(i1-1,j1,n-1) + res(i1+1,j1,n-1) + res(i1,j1+1,n-1) + res(i1,j1-1,n-1)) &
+                          + 0.25*(res(i1-1,j1-1,n-1) + res(i1-1,j1+1,n-1) + res(i1+1,j1-1,n-1) + res(i1+1,j1+1,n-1)))/(4)
         enddo
     enddo
 endsubroutine restriction
 
 
-subroutine prolongation(err22,err11)
+subroutine prolongation()
     use multigrid_mod
-    integer :: i1, j1, incx, incy
-    real, dimension(mx2,my2), intent(in) :: err22
-    real, dimension(mx1,my1), intent(inout) :: err11
+    integer :: i1, j1
 
-    
     j1 = 1
     do j=2,mx1-1,2
         j1 = j1 + 1
@@ -140,7 +135,8 @@ subroutine prolongation(err22,err11)
         do i=2,mx1-1,2
             i1 = i1 + 1
             !element in fine is related to top right coarse element
-            err11(i,j) = (err22(i1,j1) + err22(i1-1,j1) + err22(i1,j1-1) + err22(i1-1,j1-1))/4
+            ! n+1 because value of n is interpolated from level (n+1) (eg level 1 obtained from level 2)
+            err(i,j,n) = err(i,j,n) + (err(i1,j1,n+1) + err(i1-1,j1,n+1) + err(i1,j1-1,n+1) + err(i1-1,j1-1,n+1))/4
         enddo
     enddo
 
@@ -150,7 +146,7 @@ subroutine prolongation(err22,err11)
         i1 = 1
         do i=3,mx1-2,2
             i1 = i1 + 1
-            err11(i,j) = (err22(i1,j1) + err22(i1,j1+1))/2
+            err(i,j,n) = err(i,j,n) + (err(i1,j1,n+1) + err(i1,j1+1,n+1))/2
         enddo
     enddo
 
@@ -160,7 +156,7 @@ subroutine prolongation(err22,err11)
         i1 = 0
         do i=2,mx1-1,2
             i1 = i1 + 1
-            err11(i,j) = (err22(i1,j1) + err22(i1+1,j1))/2
+            err(i,j,n) = err(i,j,n) + (err(i1,j1,n+1) + err(i1+1,j1,n+1))/2
         enddo
     enddo
 
@@ -168,10 +164,9 @@ subroutine prolongation(err22,err11)
         do i=3,mx1-2,2
             i1 = (i+1)/2
             j1 = (j+1)/2
-            err11(i,j) = err22(i1,j1)
+            err(i,j,n) = err(i,j,n) + err(i1,j1,n+1)
         enddo
     enddo
-
 
 endsubroutine prolongation
 
@@ -199,6 +194,18 @@ subroutine gauss_seidel(nx,ny,del,w,source,data)
 
     data_old(:,:) = data(:,:)
 
+    ! open(15,file='gss1.dat',status='unknown')
+    ! do i=ny,1,-1
+    !     write(15,*) data(:,i)
+    ! enddo
+    ! close(15)
+
+    ! open(15,file='gsssource.dat',status='unknown')
+    ! do i=ny,1,-1
+    !     write(15,*) source(:,i)
+    ! enddo
+    ! close(15)
+
     do j = 2, ny-1
         do i = 2, nx-1
             data(i,j) = 0.25*(data(i+1,j)+data(i-1,j)+data(i,j+1)+data(i,j-1)) - (del**2)*source(i,j)/4
@@ -206,6 +213,11 @@ subroutine gauss_seidel(nx,ny,del,w,source,data)
     end do
 
     data(:,:) = (1-w)*data_old(:,:) + w*data(:,:)
+    ! open(15,file='gss2.dat',status='unknown')
+    ! do i=ny,1,-1
+    !     write(15,*) data(:,i)
+    ! enddo
+    ! close(15)
 
 endsubroutine gauss_seidel
 
@@ -217,23 +229,21 @@ endsubroutine gauss_seidel
 
 ! endsubroutine srj
 
-subroutine calc_r_multigrid(res11)
+subroutine calc_r_multigrid()
     use multigrid_mod
-    real, dimension(mx1,my1), intent(inout) :: res11
-    res11 = 0
+    res = 0
 
     do j=2,my1-1
         do i = 2,mx1-1
-            res11(i,j) = ((1/(dxm**2))*(f(i+1,j) -2*f(i,j) + f(i-1,j)) &
-                       + (1/(dym**2))*(f(i,j+1) -2*f(i,j) + f(i,j-1)))
+            res(i,j,1) = ((1/(dxm**2))*(f(i+1,j) -2*f(i,j) + f(i-1,j)) &
+                         + (1/(dym**2))*(f(i,j+1) -2*f(i,j) + f(i,j-1)))
         enddo
     enddo
 endsubroutine
 
-subroutine allocate_multigrid()
+subroutine end_multigrid()
     use multigrid_mod
-endsubroutine
-
-subroutine deallocate_multigrid()
-    use multigrid_mod
-endsubroutine
+    deallocate(res)
+    deallocate(err)
+    deallocate(f)
+end subroutine end_multigrid

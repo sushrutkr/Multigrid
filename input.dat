@@ -1,7 +1,7 @@
 |================ Input File for Numerical Methods Project ==================|
 |-------------------------- Simulation Parameters ---------------------------|
 nx  ny (internal nodes only, +2 added in code for boundaries, +1 for fc arrangement)  
-256 256
+64  64
 wavenumber for BC
 4
 |------------------------------ Solver Settings -----------------------------|
@@ -10,8 +10,8 @@ Solver(1. Gauss Seidel 2.Multigrid)
 Smoother(1. Gauss Seidel 2.Line SOR 3.SRJ)
 1
 Relaxation
-1
+1.4
 Maximum Tolerance   Maximum Iteration 
-1E-6                2000
+5E-6                2000
 Number of Levels
-1
+4
