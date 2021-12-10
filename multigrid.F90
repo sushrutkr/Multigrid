@@ -65,7 +65,7 @@ subroutine multigrid(nx,ny,uk,nlev,solver,relax,ukp1)
         ! close(15)
         !Solving Error Equation
         gsout(:,:) = 0.0
-        do k = 1,1
+        do k = 1,n
             gs_src(:,:) = 0.0
             gs_src(1:mx2,1:my2) = res(1:mx2,1:my2,n)
             call gauss_seidel(mx2,my2,dxm,w,gs_src(1:mx2,1:my2),gsout(1:mx2,1:my2))

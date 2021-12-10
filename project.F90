@@ -24,6 +24,7 @@ program numerical_project
             iter = iter + 1
         end do
         call cpu_time(end_time)
+        write(*,*) 'GS taking, Iterations = ', iter, ' with residual = ',residual
         write(logfile,*) 'Elapsed time = ', end_time-start_time
     case(multiG)
         call cpu_time(start_time)
@@ -39,6 +40,7 @@ program numerical_project
         end do
         call end_multigrid()
         call cpu_time(end_time)
+        write(*,*) 'Multigrid taking, Iterations = ', iter, ' with residual = ',residual
         write(logfile,*) 
         write(logfile,*) 'Elapsed time = ', end_time-start_time
     endselect
@@ -66,17 +68,17 @@ subroutine init_simulation()
     enddo
 
     ! Initialising Domain
-    call random_generator(nx,ny,-1.0,1.0,u_init)
-    open(15,file='random_number.dat',status='unknown')
-    do i=1,ny 
-        write(15,*) u_init(:,i)
-    enddo
-    close(15)
-    ! open(17,file='random_number.dat',status='old')
+    ! call random_generator(nx,ny,-1.0,1.0,u_init)
+    ! open(15,file='random_number.dat',status='unknown')
     ! do i=1,ny 
-    !     read(17,*) u_init(:,i)
+    !     write(15,*) u_init(:,i)
     ! enddo
-    ! close(17)
+    ! close(15)
+    open(17,file='random_number.dat',status='old')
+    do i=1,ny 
+        read(17,*) u_init(:,i)
+    enddo
+    close(17)
 
     u_init(:,:) = u_init(:,:)
     
@@ -88,15 +90,7 @@ subroutine init_simulation()
 
     u(:,:) = u_init(:,:)
     ukp1(:,:) = u(:,:)
-    uk(:,:) = u(:,:)
-
-    open(15,file='u_init.dat',status='unknown')
-    do i=ny,1,-1 
-        write(15,*) u_init(:,i)
-    enddo
-    close(15)
-
-     
+    uk(:,:) = u(:,:)     
 endsubroutine init_simulation
 
 subroutine read_input()
