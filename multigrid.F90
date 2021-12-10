@@ -71,19 +71,29 @@ subroutine multigrid(nx,ny,uk,nlev,solver,relax,ukp1)
             call gauss_seidel(mx2,my2,dxm,w,gs_src(1:mx2,1:my2),gsout(1:mx2,1:my2))
             err(1:mx2,1:my2,n) = gsout(:,:)
         end do
+
+        call calc_r_error()
+
+        ! write(*,*) dxm
         ! open(15,file='err2.dat',status='unknown')
         ! do i=my2,1,-1
         !     write(15,*) err(:,i,n)
         ! enddo
         ! close(15)
+        ! open(15,file='res2.dat',status='unknown')
+        ! do i=my2,1,-1
+        !     write(15,*) res(:,i,n)
+        ! enddo
+        ! close(15)
+
         mx1 = mx2
         my1 = my2
+        ! write(*,*) 'Restriction ',n
+        ! write(*,*) mx1,my1
     enddo
 
-    
-
     ! Prolongation
-    do n=nlev-1,1,-1 !nlev-1 to remove the last prolongation - might need testing
+    do n=nlev-1,1,-1 
         mx1 = (mx2-1)*2 + 1
         my1 = (my2-1)*2 + 1
         call prolongation()
@@ -94,6 +104,8 @@ subroutine multigrid(nx,ny,uk,nlev,solver,relax,ukp1)
         ! close(15)
         mx2 = mx1
         my2 = my1
+        ! write(*,*) 'Prolongation',n
+        ! write(*,*) mx1,my1
     enddo
 
     f(:,:) = f(:,:) - err(:,:,1)
@@ -237,6 +249,17 @@ subroutine calc_r_multigrid()
         do i = 2,mx1-1
             res(i,j,1) = ((1/(dxm**2))*(f(i+1,j) -2*f(i,j) + f(i-1,j)) &
                          + (1/(dym**2))*(f(i,j+1) -2*f(i,j) + f(i,j-1)))
+        enddo
+    enddo
+endsubroutine
+
+subroutine calc_r_error()
+    use multigrid_mod
+
+    do j=2,my2-1
+        do i = 2,mx2-1
+            res(i,j,n) =  ((1/(dxm**2))*(err(i+1,j,n) -2*err(i,j,n) + err(i-1,j,n)) &
+                         + (1/(dym**2))*(err(i,j+1,n) -2*err(i,j,n) + err(i,j-1,n)))   
         enddo
     enddo
 endsubroutine
