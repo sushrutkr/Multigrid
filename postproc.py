@@ -35,18 +35,27 @@ def plot_contour(xq,yq,data,title,fname):
     plt.show()  # show the plot     
     return
 
-def plot_data(a,b,title,fname):
-    plt.figure(figsize=(8,8))
-    plt.plot(a,b)
+def plot_data(a,b,title,fname,label):
+    plt.plot(a,b,label=label)
     plt.title(title)
-    plt.xlabel(r'Residual')
-    plt.ylabel(r'Iterations')
-    plt.savefig(fname)
-    plt.show()  # show the plot     
+    plt.legend()
+    plt.ylabel(r'Residual')
+    plt.xlabel(r'Iterations')
+
+    # plt.xscale("log")
+    plt.yscale("log")
+    
     return
 
-xq,yq,data = get_data('data.dat',3,9,9)
+xq,yq,data = get_data('../Code/data.dat',3,65,65)
 plot_contour(xq,yq,data,'Contour','contour.png')
 
-logdata = np.genfromtxt('log.dat', skip_header=2)
-plot_data(logdata[:,0],logdata[:,1],'Residual vs Iterations','residual.png')
+logdata_mg = np.genfromtxt('../Code/log_mg.dat', skip_header=2)
+logdata_gs = np.genfromtxt('../Code/log_gs.dat', skip_header=2)
+
+plt.figure(1)
+plot_data(logdata_mg[:,0],logdata_mg[:,1],'Residual vs Iterations','residual.png', 'Multigrid')
+plot_data(logdata_gs[:,0],logdata_gs[:,1],'Residual vs Iterations','residual.png', 'Gauss-Seidel')
+
+plt.savefig('residual.eps')
+plt.show()  # show the plot 
