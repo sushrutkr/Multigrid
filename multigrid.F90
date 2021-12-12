@@ -4,7 +4,7 @@ module multigrid_mod
     integer :: mx1, my1, mx2, my2, smoother ! number of grid points in x and y direction
     real :: dxm, dym, w ! weight for smoother !!! using the same variable again might be a problem !!!
     real, parameter :: pi = 3.141592653589793238462643383279502884197
-    real, dimension(:,:), allocatable :: f
+    real, dimension(:,:), allocatable :: f, gs_src, gsout 
     real, dimension(:,:,:), allocatable :: res, err
 endmodule
 
@@ -14,6 +14,7 @@ subroutine init_multigrid(nx,ny,nlev)
     allocate(res(nx,ny,nlev))
     allocate(err(nx,ny,nlev))
     allocate(f(nx,ny))
+    allocate(gs_src(nx,ny),gsout(nx,ny))
 end subroutine init_multigrid
 
 subroutine multigrid(nx,ny,uk,nlev,solver,relax,ukp1)
@@ -22,7 +23,7 @@ subroutine multigrid(nx,ny,uk,nlev,solver,relax,ukp1)
     real, intent(in) :: relax
     real, dimension(nx,ny), intent(in) :: uk 
     real, dimension(nx,ny), intent(out) :: ukp1
-    real, dimension(nx,ny) :: source, gs_src, gsout 
+    real, dimension(nx,ny) :: source
 
     w = relax
     smoother = solver
@@ -50,78 +51,108 @@ subroutine multigrid(nx,ny,uk,nlev,solver,relax,ukp1)
     ! enddo
     ! close(15)
 
-
     ! Restriction
     do n=2,nlev
-        mx2 = (mx1-1)/2 + 1
-        my2 = (my1-1)/2 + 1
-        dxm = 2*pi/(mx2-1)
-        dym = 2*pi/(my2-1)
-        call restriction()
-        ! open(15,file='res2.dat',status='unknown')
-        ! do i=my2,1,-1
-        !     write(15,*) res(:,i,n)
-        ! enddo
-        ! close(15)
-        !Solving Error Equation
-        gsout(:,:) = 0.0
-        do k = 1,n
-            gs_src(:,:) = 0.0
-            gs_src(1:mx2,1:my2) = res(1:mx2,1:my2,n)
-            call gauss_seidel(mx2,my2,dxm,w,gs_src(1:mx2,1:my2),gsout(1:mx2,1:my2))
-            err(1:mx2,1:my2,n) = gsout(:,:)
-        end do
-
-        call calc_r_error()
-
-        ! write(*,*) dxm
-        ! open(15,file='err2.dat',status='unknown')
-        ! do i=my2,1,-1
-        !     write(15,*) err(:,i,n)
-        ! enddo
-        ! close(15)
-        ! open(15,file='res2.dat',status='unknown')
-        ! do i=my2,1,-1
-        !     write(15,*) res(:,i,n)
-        ! enddo
-        ! close(15)
-
-        mx1 = mx2
-        my1 = my2
-        ! write(*,*) 'Restriction ',n
-        ! write(*,*) mx1,my1
+        call fine_to_coarse()
     enddo
 
     ! Prolongation
     do n=nlev-1,1,-1 
-        mx1 = (mx2-1)*2 + 1
-        my1 = (my2-1)*2 + 1
-        call prolongation()
-        ! open(15,file='err1.dat',status='unknown')
-        ! do i=my1,1,-1
-        !     write(15,*) err(:,i,n)
-        ! enddo
-        ! close(15)
-        mx2 = mx1
-        my2 = my1
-        ! write(*,*) 'Prolongation',n
-        ! write(*,*) mx1,my1
+        call coarse_to_fine()
     enddo
-
+  
     f(:,:) = f(:,:) - err(:,:,1)
-    ! open(15,file='fc.dat',status='unknown')
-    ! do i=my1,1,-1
-    !     write(15,*) f(:,i)
-    ! enddo
-    ! close(15)
     ukp1(:,:) = f(:,:)
 endsubroutine multigrid
+
+subroutine fine_to_coarse()
+    use multigrid_mod
+
+    mx2 = (mx1-1)/2 + 1
+    my2 = (my1-1)/2 + 1
+    dxm = 2*pi/(mx2-1)
+    dym = 2*pi/(my2-1)
+    call restriction()
+    ! open(15,file='res2.dat',status='unknown')
+    ! do i=my2,1,-1
+    !     write(15,*) res(:,i,n)
+    ! enddo
+    ! close(15)
+    !Solving Error Equation
+    gsout(:,:) = 0.0
+    gs_src(:,:) = 0.0
+    gs_src(1:mx2,1:my2) = res(1:mx2,1:my2,n)
+    do k = 1,n
+        call gauss_seidel(mx2,my2,dxm,w,gs_src(1:mx2,1:my2),gsout(1:mx2,1:my2))
+    end do
+    err(1:mx2,1:my2,n) = gsout(:,:)
+    call calc_r_error(mx2,my2)
+
+    ! write(*,*) dxm
+    ! open(15,file='err2.dat',status='unknown')
+    ! do i=my2,1,-1
+    !     write(15,*) err(:,i,n)
+    ! enddo
+    ! close(15)
+    ! open(15,file='res2.dat',status='unknown')
+    ! do i=my2,1,-1
+    !     write(15,*) res(:,i,n)
+    ! enddo
+    ! close(15)
+
+    mx1 = mx2
+    my1 = my2
+    ! write(*,*) 'Restriction ',n
+    ! write(*,*) mx1,my1
+endsubroutine fine_to_coarse
+
+subroutine coarse_to_fine()
+    use multigrid_mod
+    mx1 = (mx2-1)*2 + 1
+    my1 = (my2-1)*2 + 1
+    dxm = 2*pi/(mx1-1)
+    dym = 2*pi/(my1-1)
+    
+    call prolongation()
+
+    if (n==2) then
+        write(*,*) 'Prolongation ',n
+        write(*,*) res(2,2,n)
+        write(*,*) err(1,2,n), err(3,2,n), err(2,1,n), err(2,3,n)
+    endif
+
+    ! Check for current configuration - Target to 43(or42) iteration (Benchmark)
+    gsout(:,:) = 0.0
+    gs_src(:,:) = 0.0
+    gs_src(1:mx1,1:my1) = res(1:mx1,1:my1,n)
+    do k = 1,1
+        call gauss_seidel(mx1,my1,dxm,w,gs_src(1:mx1,1:my1),gsout(1:mx1,1:my1))
+    end do
+    err(1:mx1,1:my1,n) = gsout(:,:)
+
+    if(n == 2) then
+        open(15,file='err1.dat',status='unknown')
+        do i=my1,1,-1
+            write(15,*) err(:,i,n)
+        enddo
+        close(15)
+    endif
+    ! open(15,file='err1.dat',status='unknown')
+    ! do i=my1,1,-1
+    !     write(15,*) err(:,i,n)
+    ! enddo
+    ! close(15)
+    mx2 = mx1
+    my2 = my1
+    ! write(*,*) 'Prolongation',n
+    ! write(*,*) mx1,my1
+
+endsubroutine coarse_to_fine
 
 subroutine restriction()
     use multigrid_mod
     integer :: i1, j1, incx, incy
-    ! This is one method, other could be the increment one in notes - requires testing
-    ! for restriction trapezoidal rule can be used 
+
     incx = 0
     incy = 0
     do j = 2, my2 - 1
@@ -134,7 +165,6 @@ subroutine restriction()
         enddo
     enddo
 endsubroutine restriction
-
 
 subroutine prolongation()
     use multigrid_mod
@@ -149,6 +179,7 @@ subroutine prolongation()
             !element in fine is related to top right coarse element
             ! n+1 because value of n is interpolated from level (n+1) (eg level 1 obtained from level 2)
             err(i,j,n) = err(i,j,n) + (err(i1,j1,n+1) + err(i1-1,j1,n+1) + err(i1,j1-1,n+1) + err(i1-1,j1-1,n+1))/4
+            ! res(i,j,n) = (res(i1,j1,n+1) + res(i1-1,j1,n+1) + res(i1,j1-1,n+1) + res(i1-1,j1-1,n+1))/4
         enddo
     enddo
 
@@ -158,7 +189,9 @@ subroutine prolongation()
         i1 = 1
         do i=3,mx1-2,2
             i1 = i1 + 1
+            !element in fine is related to top coarse element
             err(i,j,n) = err(i,j,n) + (err(i1,j1,n+1) + err(i1,j1+1,n+1))/2
+            ! res(i,j,n) = (res(i1,j1,n+1) + res(i1,j1+1,n+1))/2
         enddo
     enddo
 
@@ -168,7 +201,9 @@ subroutine prolongation()
         i1 = 0
         do i=2,mx1-1,2
             i1 = i1 + 1
+            !element in fine is related to left coarse element
             err(i,j,n) = err(i,j,n) + (err(i1,j1,n+1) + err(i1+1,j1,n+1))/2
+            ! res(i,j,n) = (res(i1,j1,n+1) + res(i1+1,j1,n+1))/2
         enddo
     enddo
 
@@ -177,24 +212,11 @@ subroutine prolongation()
             i1 = (i+1)/2
             j1 = (j+1)/2
             err(i,j,n) = err(i,j,n) + err(i1,j1,n+1)
+            ! res(i,j,n) = res(i1,j1,n+1)
         enddo
     enddo
 
 endsubroutine prolongation
-
-! subroutine itsolv
-!     use multigrid_mod
-
-!     ! write(*,*) smoother
-
-!     select case(smoother)
-!     case(1)
-!         call gauss_seidel(mx1,my1,f,0.0)
-!     case(2)
-!         !call srj(nx,ny,uk,ukp1)
-!     end select
-
-! endsubroutine itsolv
 
 subroutine gauss_seidel(nx,ny,del,w,source,data)
     integer :: i,j
@@ -233,14 +255,6 @@ subroutine gauss_seidel(nx,ny,del,w,source,data)
 
 endsubroutine gauss_seidel
 
-! subroutine srj(nx,ny,uk,ukp1)
-!     use multigrid_mod
-
-!     integer, intent(in) :: nx,ny
-!     real, dimension(:,:), intent(in) :: uk
-
-! endsubroutine srj
-
 subroutine calc_r_multigrid()
     use multigrid_mod
     res = 0
@@ -253,13 +267,14 @@ subroutine calc_r_multigrid()
     enddo
 endsubroutine
 
-subroutine calc_r_error()
+subroutine calc_r_error(nxr,nyr)
     use multigrid_mod
+    integer, intent(in) :: nxr, nyr
 
-    do j=2,my2-1
-        do i = 2,mx2-1
-            res(i,j,n) =  ((1/(dxm**2))*(err(i+1,j,n) -2*err(i,j,n) + err(i-1,j,n)) &
-                         + (1/(dym**2))*(err(i,j+1,n) -2*err(i,j,n) + err(i,j-1,n)))   
+    do j=2,nxr-1
+        do i = 2,nyr-1
+            res(i,j,n) =  -(((1/(dxm**2))*(err(i+1,j,n) -2*err(i,j,n) + err(i-1,j,n)) &
+                         + (1/(dym**2))*(err(i,j+1,n) -2*err(i,j,n) + err(i,j-1,n)))  - res(i,j,n))
         enddo
     enddo
 endsubroutine
@@ -269,4 +284,6 @@ subroutine end_multigrid()
     deallocate(res)
     deallocate(err)
     deallocate(f)
+    deallocate(gs_src)
+    deallocate(gsout)
 end subroutine end_multigrid

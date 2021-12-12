@@ -4,8 +4,6 @@ program numerical_project
 
     call init_simulation()
 
-    open(unit=logfile,file='log.dat',status='unknown')
-    
     residual = 1
     s(:,:) = 0.0
     start_time = 0.0
@@ -13,6 +11,7 @@ program numerical_project
 
     select case(solver)
     case(gs)
+        open(unit=logfile,file='log_gs.dat',status='unknown')
         call cpu_time(start_time)
         write(logfile,*) 'nx = ', nx-1, ' ny = ', ny-1, ' Solver = Gauss Seidel'
         write(logfile,*) 'Iteration        Residual'
@@ -24,13 +23,13 @@ program numerical_project
             iter = iter + 1
         end do
         call cpu_time(end_time)
-        write(*,*) 'GS taking, Iterations = ', iter, ' with residual = ',residual
-        write(logfile,*) 'Elapsed time = ', end_time-start_time
+        write(*,*) 'GS taking, Iterations = ', iter, ' with residual = ',residual,' in time = ', end_time-start_time
     case(multiG)
-        call cpu_time(start_time)
+        open(unit=logfile,file='log_mg.dat',status='unknown')
         call init_multigrid(nx,ny,nlev)
         write(logfile,*) 'nx = ', nx-1, ' ny = ', ny-1,' Solver = Multigrid, Smoother = ', it_smoother
         write(logfile,*) 'Iteration        Residual'
+        call cpu_time(start_time)
         do while(residual>tol .and. iter<maxiter)
             call multigrid(nx,ny,uk,nlev,it_smoother,w,ukp1)
             call calc_residual(nx,ny,dx,dy,ukp1,residual)
@@ -38,11 +37,10 @@ program numerical_project
             uk = ukp1 
             iter = iter + 1
         end do
-        call end_multigrid()
         call cpu_time(end_time)
-        write(*,*) 'Multigrid taking, Iterations = ', iter, ' with residual = ',residual
+        call end_multigrid()
         write(logfile,*) 
-        write(logfile,*) 'Elapsed time = ', end_time-start_time
+        write(*,*) 'Multigrid taking, Iterations = ', iter, ' with residual = ',residual,' in time = ', end_time-start_time
     endselect
 
     u(:,:) = ukp1(:,:)
@@ -68,12 +66,12 @@ subroutine init_simulation()
     enddo
 
     ! Initialising Domain
-    ! call random_generator(nx,ny,-1.0,1.0,u_init)
-    ! open(15,file='random_number.dat',status='unknown')
-    ! do i=1,ny 
-    !     write(15,*) u_init(:,i)
-    ! enddo
-    ! close(15)
+    call random_generator(nx,ny,-1.0,1.0,u_init)
+    open(15,file='random_number.dat',status='unknown')
+    do i=1,ny 
+        write(15,*) u_init(:,i)
+    enddo
+    close(15)
     open(17,file='random_number.dat',status='old')
     do i=1,ny 
         read(17,*) u_init(:,i)

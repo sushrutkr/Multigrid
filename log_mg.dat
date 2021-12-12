@@ -1,0 +1,4 @@
+ nx =            8  ny =            8  Solver = Multigrid, Smoother =            1
+ Iteration        Residual
+           0  0.295579731    
+
