@@ -66,12 +66,12 @@ subroutine init_simulation()
     enddo
 
     ! Initialising Domain
-    call random_generator(nx,ny,-1.0,1.0,u_init)
-    open(15,file='random_number.dat',status='unknown')
-    do i=1,ny 
-        write(15,*) u_init(:,i)
-    enddo
-    close(15)
+    ! call random_generator(nx,ny,-1.0,1.0,u_init)
+    ! open(15,file='random_number.dat',status='unknown')
+    ! do i=1,ny 
+    !     write(15,*) u_init(:,i)
+    ! enddo
+    ! close(15)
     open(17,file='random_number.dat',status='old')
     do i=1,ny 
         read(17,*) u_init(:,i)

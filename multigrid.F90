@@ -73,11 +73,14 @@ subroutine fine_to_coarse()
     dxm = 2*pi/(mx2-1)
     dym = 2*pi/(my2-1)
     call restriction()
-    ! open(15,file='res2.dat',status='unknown')
-    ! do i=my2,1,-1
-    !     write(15,*) res(:,i,n)
-    ! enddo
-    ! close(15)
+
+    ! if (n==3) then 
+    !     open(15,file='res2.dat',status='unknown')
+    !     do i=my2,1,-1
+    !         write(15,*) res(:,i,n)
+    !     enddo
+    !     close(15)
+    ! endif
     !Solving Error Equation
     gsout(:,:) = 0.0
     gs_src(:,:) = 0.0
@@ -89,16 +92,19 @@ subroutine fine_to_coarse()
     call calc_r_error(mx2,my2)
 
     ! write(*,*) dxm
-    ! open(15,file='err2.dat',status='unknown')
-    ! do i=my2,1,-1
-    !     write(15,*) err(:,i,n)
-    ! enddo
-    ! close(15)
-    ! open(15,file='res2.dat',status='unknown')
-    ! do i=my2,1,-1
-    !     write(15,*) res(:,i,n)
-    ! enddo
-    ! close(15)
+
+    ! if(n==2) then
+    !     open(15,file='err2.dat',status='unknown')
+    !     do i=my2,1,-1
+    !         write(15,*) err(:,i,n)
+    !     enddo
+    !     close(15)
+    !     open(15,file='res2.dat',status='unknown')
+    !     do i=my2,1,-1
+    !         write(15,*) res(:,i,n)
+    !     enddo
+    !     close(15)
+    ! endif
 
     mx1 = mx2
     my1 = my2
@@ -115,14 +121,21 @@ subroutine coarse_to_fine()
     
     call prolongation()
 
-    if (n==2) then
-        write(*,*) 'Prolongation ',n
-        write(*,*) res(2,2,n)
-        write(*,*) err(1,2,n), err(3,2,n), err(2,1,n), err(2,3,n)
-    endif
+    ! if (n==2) then
+    !     write(*,*) 'Prolongation ',n
+    !     write(*,*) res(2,2,n)
+    !     write(*,*) err(1,2,n), err(3,2,n), err(2,1,n), err(2,3,n)
+    ! endif
+    ! if(n == 1) then
+    !     open(15,file='err1.dat',status='unknown')
+    !     do i=my1,1,-1
+    !         write(15,*) err(:,i,n)
+    !     enddo
+    !     close(15)
+    ! endif
 
     ! Check for current configuration - Target to 43(or42) iteration (Benchmark)
-    gsout(:,:) = 0.0
+    gsout(:,:) = err(1:mx1,1:my1,n)
     gs_src(:,:) = 0.0
     gs_src(1:mx1,1:my1) = res(1:mx1,1:my1,n)
     do k = 1,1
@@ -130,18 +143,14 @@ subroutine coarse_to_fine()
     end do
     err(1:mx1,1:my1,n) = gsout(:,:)
 
-    if(n == 2) then
-        open(15,file='err1.dat',status='unknown')
-        do i=my1,1,-1
-            write(15,*) err(:,i,n)
-        enddo
-        close(15)
-    endif
-    ! open(15,file='err1.dat',status='unknown')
-    ! do i=my1,1,-1
-    !     write(15,*) err(:,i,n)
-    ! enddo
-    ! close(15)
+    ! if(n == 1) then
+    !     open(15,file='errgsp.dat',status='unknown')
+    !     do i=my1,1,-1
+    !         write(15,*) err(:,i,n)
+    !     enddo
+    !     close(15)
+    ! endif
+
     mx2 = mx1
     my2 = my1
     ! write(*,*) 'Prolongation',n
@@ -239,6 +248,11 @@ subroutine gauss_seidel(nx,ny,del,w,source,data)
     !     write(15,*) source(:,i)
     ! enddo
     ! close(15)
+    ! i = 2
+    ! j = 2
+    ! if(ny==5) then
+    !     write(*,*) 'ny=5',data(2,2), 0.25*(data(i+1,j)+data(i-1,j)+data(i,j+1)+data(i,j-1)),(del**2)*source(i,j)/4
+    ! endif
 
     do j = 2, ny-1
         do i = 2, nx-1
