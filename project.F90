@@ -176,7 +176,6 @@ subroutine calc_residual(nx,ny,dx,dy,data,residual_out)
 
     residual = 0
 
-    ! L1 Norm
     do j=2,ny-1
         do i = 2,nx-1
             residual = residual + abs((1/(dx**2))*(data(i+1,j) -2*data(i,j) + data(i-1,j)) &
@@ -184,16 +183,6 @@ subroutine calc_residual(nx,ny,dx,dy,data,residual_out)
         enddo
     enddo
     residual = residual/((nx-2)*(ny-2))
-
-    ! L2 norm
-    ! do j=2,ny-1
-    !     do i = 2,nx-1
-    !         residual = residual + ((1/(dx**2))*(data(i+1,j) -2*data(i,j) + data(i-1,j)) &
-    !                              + (1/(dy**2))*(data(i,j+1) -2*data(i,j) + data(i,j-1)))**2
-    !     enddo
-    ! enddo
-
-    ! residual = sqrt(residual)/((nx-2)*(ny-2))
 
     residual_out = residual
 endsubroutine
